@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"regexp"
@@ -77,13 +78,18 @@ func putKey(w http.ResponseWriter, r *http.Request) {
 }
 
 func setKey(w http.ResponseWriter, r *http.Request, noUpdate bool) {
-	req := r.FormValue("data")
-	if req == "" {
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		writeError(err, w)
+		return
+	}
+	defer r.Body.Close()
+	if string(body) == "" {
 		writeError(fmt.Errorf("no key specified"), w)
 		return
 	}
 	kv := make(map[string]interface{}, 0)
-	err := json.Unmarshal([]byte(req), &kv)
+	err = json.Unmarshal(body, &kv)
 	if err != nil {
 		writeError(err, w)
 		return
@@ -131,27 +137,52 @@ func getKeys(w http.ResponseWriter, r *http.Request) {
 	w.Write(out)
 }
 
+func dumpKeystore(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		http.NotFound(w, r)
+		return
+	}
+	out, err := json.Marshal(&keystore)
+	if err != nil {
+		writeError(err, w)
+	} else {
+		w.Write(out)
+	}
+}
+
 func root(w http.ResponseWriter, r *http.Request) {
-	index := `drunken_dangerzone!
-
-Simple in-memory key-value store powered by Go. The following endpoints
-are supported:
-
-  * GET /key     - retrieve a list of all keys stored in the server
-  * PUT /key     - json-encode a list of keys and their values, and they
-                   will be stored as long as they aren't already present
-                   in the keystore.
-  * POST /key    - similar to PUT, but will overwrite any existing values.
-  * GET /key/:id - retrieve the value associated with the id.
-`
+	index := `<html>
+  <head>
+    <title>drunken-dangerzone</title>
+    <meta http-equiv='Content-Type'
+          content='text/html;charset=utf-8' />
+  </head>
+  <body>
+    <h1>drunken-dangerzone!</h1>
+    <p>This is a simple in-memory key-value store powered by Go.</p>
+    <p>Supported endpoints:
+      <ul>
+        <li>GET /key     - retrieve a list of all keys stored in the server</li>
+        <li>PUT /key     - json-encode a list of keys and their values, and
+                           they will be stored as long as they aren't already
+                           present</li>
+        <li>POST /key    - similar to PUT, but will overwrite anyexisting values.</li>
+        <li>GET /key/:id - retrieve the value associated with the id.</li>
+        <li>GET /keystore.json - retrieve the full keystore as json.</li>
+      </ul>
+    </p>
+  </body>
+</html>`
 	w.Write([]byte(index))
 }
 
 func main() {
 	port := flag.String("p", "8080", "port to listen on")
+	flag.Parse()
 
 	http.HandleFunc("/key/", getKey)
 	http.HandleFunc("/key", handleKey)
+	http.HandleFunc("/keystore.json", dumpKeystore)
 	http.HandleFunc("/", root)
 	log.Printf("drunken dangerzone is starting on http://127.0.0.1:%s", *port)
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", *port), nil))
