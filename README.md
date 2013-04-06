@@ -9,6 +9,9 @@ originally wrote this as a comparison to the
 Visit 127.0.0.1:8080 (or whatever port you chose); the list of endpoints
 is displayed there.
 
+### What's up with the name?
+It was the one Github randomly generated on the new project page.
+
 ### LICENSE
 
 drunken_dangerzone is released under the ISC license:
